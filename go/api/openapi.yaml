@@ -1,0 +1,4135 @@
+openapi: 3.0.1
+info:
+  contact:
+    name: Aptly
+    url: http://github.com/aptly-dev/aptly
+  description: |
+    Aptly operations are also available via REST API served with `aptly api serve`.
+
+    On Debian based systems, a package `aptly-api` is available, which will run aptly as systemd service as dedicated aptly-api user.
+
+    Some configuration changes (S3 publishing endpoints, ...) will require restarting the aptly service in order to take effect.
+
+    The REST API shouldn't be exposed to the Internet as there is no authentication/protection, consider using a HTTP proxy (e.g. nginx) to add https and authentication.
+
+    #### Aptly REST API Documentation
+  title: Aptly API
+  version: 1.6.2+20260228114657.9defe70
+servers:
+- url: /
+tags:
+- description: |+
+    # Manage Local Repositories
+    <div>
+    A local repository is a collection of versionned packages (usually custom packages created internally).
+
+    Packages can be added, removed, moved or copied between repos.
+
+    Local repositories can be published (either directly or via snapshot) to be used a APT source on a debian based system.
+    </div>
+
+  name: Repos
+- description: |
+    # Upload Package Files
+    <div>
+
+    In order to add debian package files to a local repository, files are first uploaded to a temporary directory.
+    Then the directory (or a specific file within) is added to a repository. After adding to a repositorty, the directory resp. files are removed bt default.
+
+    All uploaded files are stored under `<rootDir>/upload/<tempdir>` directory.
+
+    For concurrent uploads from CI/CD pipelines, make sure the tempdir is unique.
+
+
+    </div>
+  name: Files
+- description: |+
+    # Manage Remote Repository Mirrors
+    <div>
+    Manage mirrors of remote Debian repositories (http, https or ftp).
+
+    Flat debian repositories, mirroring source packages and debian installers is supported.
+
+    </div>
+
+  name: Mirrors
+- description: |
+    # Manage Snapshots
+    <div>
+
+    Local Repositories and Mirrors can be snapshotted to get an immutable state.
+
+    Snapshots cab be merged, filtered, verified for missing dependencies. Snapshots can be published to be used as APT source.
+
+    </div>
+  name: Snapshots
+- description: |
+    # Publish Repositories, Snapshots, Mirrors
+    <div>
+
+    Publish snapshot or local repo as Debian repository to be used as APT source on Debian based systems.
+
+    The published repository is signed with the user's GnuPG key.
+
+    Repositories can be published to local directories, Amazon S3 buckets, Azure or Swift Storage.
+
+    #### GPG Keys
+
+    GPG key is required to sign any published repository. The key pari should be generated before publishing.
+
+    Public part of the key should be exported from your keyring using `gpg --export --armor` and imported on the system which uses a published repository.
+
+    * Multiple signing keys can be defined in aptly.conf using the gpgKeys array:
+    ```
+    "gpgKeys": [
+        "KEY_ID_x",
+        "KEY_ID_y"
+    ]
+    ```
+
+    * It is also possible to pass multiple keys via the CLI using the repeatable `--gpg-key` flag:
+    ```
+    aptly publish repo my-repo --gpg-key=KEY_ID_a --gpg-key=KEY_ID_b
+    ```
+    * When using the REST API, the `gpgKey` parameter supports a comma-separated list of key IDs:
+    ```
+    "gpgKey": "KEY_ID_a,KEY_ID_b"
+    ```
+    * If `--gpg-key` is specified on the command line, or `gpgKey` is provided via the REST API, it takes precedence over any gpgKeys configuration in aptly.conf.
+    * With multi-key support, aptly will sign all Release files (both clearsigned and detached signatures) with each provided key, ensuring a smooth key rotation process while maintaining compatibility for existing clients.
+
+    #### Parameters
+
+    Publish APIs use following convention to identify published repositories: `/api/publish/:prefix/:distribution`.  `:distribution` is distribution name, while `:prefix` is `[<storage>:]<prefix>` (storage is optional, it defaults to empty string), if publishing prefix contains slashes `/`, they should be replaced with underscores (`_`) and underscores
+    should be replaced with double underscore (`__`). To specify root `:prefix`, use `:.`, as `.` is ambigious in URLs.
+
+    </div>
+  name: Publish
+- description: |+
+    # Search Package Collection
+    <div>
+    Perform operations on the whole collection of packages in apty database.
+    </div>
+
+  name: Packages
+- description: |
+    # Status Information
+    <div>
+    Various status information.
+
+    </div>
+  name: Status
+- description: |
+    # Maintenance Operations
+    <div>
+    Manage aptly’s internal metadata database and package pool.
+
+    </div>
+  name: Database
+- description: |
+    # Background Tasks
+    <div>
+
+    Several API operations allow to be run in background asynchronously in a task. In that case, a Task object with an ID and a State is returned, which can be queried for progress.
+
+    Tasks should be deleted once they are no longer in progress, in order to not cause memory overflows.
+
+    </div>
+  name: Tasks
+paths:
+  /api/db/cleanup:
+    post:
+      description: |-
+        **Cleanup Aptly DB**
+        Database cleanup removes information about unreferenced packages and deletes files in the package pool that aren’t used by packages anymore.
+        It is a good idea to run this command after massive deletion of mirrors, snapshots or local repos.
+      parameters:
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Output
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: DB Cleanup
+      tags:
+      - Database
+  /api/files:
+    get:
+      description: |-
+        **Get list of upload directories**
+
+        **Example:**
+        ```
+        $ curl http://localhost:8080/api/files
+        ["aptly-0.9"]
+        ```
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: List of files
+      summary: List Directories
+      tags:
+      - Files
+  /api/files/{dir}:
+    delete:
+      description: |-
+        **Delete upload directory and uploaded files within**
+
+        **Example:**
+        ```
+        $ curl -X DELETE http://localhost:8080/api/files/aptly-0.9
+        {}
+        ```
+      parameters:
+      - description: Directory
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Delete Directory
+      tags:
+      - Files
+    get:
+      description: |-
+        **Show uploaded files in upload directory**
+
+        **Example:**
+        ```
+        $ curl http://localhost:8080/api/files/aptly-0.9
+        ["aptly_0.9~dev+217+ge5d646c_i386.deb"]
+        ```
+      parameters:
+      - description: Directory to list
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: Files found in directory
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: List Files
+      tags:
+      - Files
+    post:
+      description: |-
+        **Upload files to a directory**
+
+        - one or more files can be uploaded
+        - existing uploaded are overwritten
+
+        **Example:**
+        ```
+        $ curl -X POST -F file=@aptly_0.9~dev+217+ge5d646c_i386.deb http://localhost:8080/api/files/aptly-0.9
+        ["aptly-0.9/aptly_0.9~dev+217+ge5d646c_i386.deb"]
+        ```
+      parameters:
+      - description: Directory to upload files to. Created if does not exist
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/_api_files__dir__post_request"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: list of uploaded files
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Upload Files
+      tags:
+      - Files
+  /api/files/{dir}/{name}:
+    delete:
+      description: |-
+        **Delete a uploaded file in upload directory**
+
+        **Example:**
+        ```
+        $ curl -X DELETE http://localhost:8080/api/files/aptly-0.9/aptly_0.9~dev+217+ge5d646c_i386.deb
+        {}
+        ```
+      parameters:
+      - description: Directory to delete from
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      - description: File to delete
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Delete File
+      tags:
+      - Files
+  /api/gpg/key:
+    post:
+      description: |
+        **Adds GPG keys to aptly keyring**
+
+        Add GPG public keys for veryfing remote repositories for mirroring.
+
+        Keys can be added in two ways:
+        * By providing the ASCII armord key in `GpgKeyArmor` (leave Keyserver and GpgKeyID empty)
+        * By providing a `Keyserver` and one or more key IDs in `GpgKeyID`, separated by space (leave GpgKeyArmor empty)
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.gpgAddKeyParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+      summary: Add GPG Keys
+      tags:
+      - Mirrors
+      x-codegen-request-body-name: request
+  /api/graph.{ext}:
+    get:
+      description: |-
+        **Generate dependency graph**
+
+        Command graph generates graph of dependencies:
+
+        * between snapshots and mirrors (what mirror was used to create each snapshot)
+        * between snapshots and local repos (what local repo was used to create snapshot)
+        * between snapshots (pulling, merging, etc.)
+        * between snapshots, local repos and published repositories (how snapshots were published).
+
+        Graph is rendered to PNG file using graphviz package.
+
+        Example URL: `http://localhost:8080/api/graph.svg?layout=vertical`
+      parameters:
+      - description: "ext specifies desired file extension, e.g. .png, .svg."
+        in: path
+        name: ext
+        required: true
+        schema:
+          type: string
+      - description: Change between a `horizontal` (default) and a `vertical` graph
+          layout.
+        in: query
+        name: layout
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            image/png:
+              schema:
+                items:
+                  format: int32
+                  type: integer
+                type: array
+            ' image/svg+xml':
+              schema:
+                items:
+                  format: int32
+                  type: integer
+                type: array
+          description: Output
+        "404":
+          content:
+            image/png:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+            ' image/svg+xml':
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            image/png:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+            ' image/svg+xml':
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Graph Output
+      tags:
+      - Status
+  /api/healthy:
+    get:
+      description: |-
+        **Get aptly health state**
+
+        Return aptly health state:
+        - `Aptly is healthy` (HTTP 200)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.aptlyStatus"
+          description: OK
+      summary: Get Health State
+      tags:
+      - Status
+  /api/mirrors:
+    get:
+      description: |-
+        **Show list of currently available mirrors**
+        Each mirror is returned as in “show” API.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/github_com_aptly-dev_aptly_deb.RemoteRepo"
+                type: array
+          description: OK
+      summary: List Mirrors
+      tags:
+      - Mirrors
+    post:
+      description: '**Create a mirror of a remote repository**'
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.mirrorCreateParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.RemoteRepo"
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+      summary: Create Mirror
+      tags:
+      - Mirrors
+      x-codegen-request-body-name: request
+  /api/mirrors/{name}:
+    delete:
+      description: '**Delete a mirror**'
+      parameters:
+      - description: mirror name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: "force: 1 to enable"
+        in: query
+        name: force
+        required: true
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/github_com_aptly-dev_aptly_task.ProcessReturnValue"
+          description: OK
+        "403":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Unable to delete mirror with snapshots
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Mirror not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Unable to delete
+      summary: Delete Mirror
+      tags:
+      - Mirrors
+    get:
+      description: '**Get mirror information by name**'
+      parameters:
+      - description: mirror name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.RemoteRepo"
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Mirror not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Get Mirror Info
+      tags:
+      - Mirrors
+    put:
+      description: '**Update Mirror and download packages**'
+      parameters:
+      - description: mirror name to update
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.mirrorUpdateParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.ProcessReturnValue"
+          description: Mirror was updated successfully
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.Task"
+          description: Mirror is being updated
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Unable to determine list of architectures
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Mirror not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Update Mirror
+      tags:
+      - Mirrors
+      x-codegen-request-body-name: request
+  /api/mirrors/{name}/packages:
+    get:
+      description: '**Get a list of packages from a mirror**'
+      parameters:
+      - description: mirror name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: search query
+        in: query
+        name: q
+        schema:
+          type: string
+      - description: "format: `details` for more detailed information"
+        in: query
+        name: format
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/deb.Package"
+                type: array
+          description: List of Packages
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Unable to determine list of architectures
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Mirror not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: List Mirror Packages
+      tags:
+      - Mirrors
+  /api/mirrors/{name}/snapshots:
+    post:
+      description: '**Create a snapshot of a mirror**'
+      parameters:
+      - description: Mirror name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsCreateFromMirrorParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Created Snapshot
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Mirror Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Conflicting snapshot
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Snapshot Mirror
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/packages:
+    get:
+      description: '**Get list of packages**'
+      parameters:
+      - description: search query
+        in: query
+        name: q
+        schema:
+          type: string
+      - description: "format: `details` for more detailed information"
+        in: query
+        name: format
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: List of packages
+      summary: List Packages
+      tags:
+      - Packages
+  /api/packages/{key}:
+    get:
+      description: |-
+        **Show information about package by package key**
+        Package keys could be obtained from various GET .../packages APIs.
+      parameters:
+      - description: package key (unique package identifier)
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Package"
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: Get Package Info
+      tags:
+      - Packages
+  /api/publish:
+    get:
+      description: |-
+        **Get list of published repositories**
+
+        Return list of published repositories including detailed information.
+
+        See also: `aptly publish list`
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/deb.PublishedRepo"
+                type: array
+          description: OK
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: List Published Repositories
+      tags:
+      - Publish
+  /api/publish/{prefix}:
+    post:
+      description: |-
+        **Publish a local repository or snapshot**
+
+        Create a published repository.
+
+        The prefix may contain a storage specifier, e.g. `s3:packages/`, or it may also be empty to publish to the root directory.
+
+        **Example:**
+        ```
+        $ curl -X POST -H 'Content-Type: application/json' --data '{"Distribution": "wheezy", "Sources": [{"Name": "aptly-repo"}]}' http://localhost:8080/api/publish//repos
+        {"Architectures":["i386"],"Distribution":"wheezy","Label":"","Origin":"","Prefix":".","SourceKind":"local","Sources":[{"Component":"main","Name":"aptly-repo"}],"Storage":""}
+        ```
+
+        See also: `aptly publish create`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.publishedRepoCreateParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.PublishedRepo"
+          description: Created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Source not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Create Published Repository
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+  /api/publish/{prefix}/{distribution}:
+    delete:
+      description: |-
+        **Delete a published repository**
+
+        Delete a distribution of a published repository and remove associated files.
+
+        If no other published repositories share the same prefix, all files inside the prefix will be removed.
+
+        See also: `aptly publish drop`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: "force: 1 to enable"
+        in: query
+        name: force
+        required: true
+        schema:
+          type: integer
+      - description: "skipCleanup: 1 to enable"
+        in: query
+        name: skipCleanup
+        required: true
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Delete Published Repository
+      tags:
+      - Publish
+    get:
+      description: |-
+        **Get published repository information**
+
+        Show detailed information of a published repository.
+
+        See also: `aptly publish show`
+      parameters:
+      - description: "publishing prefix, use `:.` instead of `.` because it is ambigious\
+          \ in URLs"
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.PublishedRepo"
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Show Published Repository
+      tags:
+      - Publish
+    put:
+      description: |-
+        **Update a published repository**
+
+        Update a published local repository or switch snapshot.
+
+        For published local repositories:
+        * update to match local repository contents
+
+        For published snapshots:
+        * switch components to new snapshot
+
+        See also: `aptly publish update` / `aptly publish switch`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.publishedRepoUpdateSwitchParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.PublishedRepo"
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository or source not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Update Published Repository
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+  /api/publish/{prefix}/{distribution}/sources:
+    delete:
+      description: |-
+        **Discard pending source component changes of a published repository**
+
+        Remove all pending changes what would be applied with a subsequent publish update call (i.e. `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source drop`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Discard Pending Changes
+      tags:
+      - Publish
+    get:
+      description: |-
+        **List source component changes to be applied**
+
+        Return added, removed or changed components of snapshots or local repository to be published.
+
+        The changes will be applied by a subsequent publish update call (i.e. `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source list`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  items:
+                    $ref: "#/components/schemas/deb.SourceEntry"
+                  type: array
+                type: array
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository pending changes not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: List Pending Changes
+      tags:
+      - Publish
+    post:
+      description: |-
+        **Add a source component to a published repo**
+
+        Add a component of a snapshot or local repository to be published.
+
+        This call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source add`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.sourceParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content: {}
+          description: Created
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Add Source Component
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+    put:
+      description: |-
+        **Replace the source components of a published repository**
+
+        Sets the components of snapshots or local repositories to be published. Existing Sourced will be replaced.
+
+        This call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source replace`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              items:
+                $ref: "#/components/schemas/api.sourceParams"
+              type: array
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Replace Source Components
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+  /api/publish/{prefix}/{distribution}/sources/{component}:
+    delete:
+      description: |-
+        **Remove a source component from a published repo**
+
+        Remove a source component (snapshot / local repo) from a published repository.
+
+        This call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source remove`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: component name
+        in: path
+        name: component
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Remove Source Component
+      tags:
+      - Publish
+    put:
+      description: |-
+        **Update the source component of a published repository**
+
+        Update a component of a snapshot or local repository to be published.
+
+        This call does not publish the changes, but rather schedules them for a subsequent publish update call (i.e `PUT /api/publish/{prefix}/{distribution}` / `POST /api/publish/{prefix}/{distribution}/update`).
+
+        See also: `aptly publish source update`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: component name
+        in: path
+        name: component
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.sourceParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content: {}
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository/component not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Update Source Component
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+  /api/publish/{prefix}/{distribution}/update:
+    post:
+      description: |-
+        **Update a published repository**
+
+        Publish pending source component changes which were added with `Add/Remove/Replace Source Components`
+
+        See also: `aptly publish update`
+      parameters:
+      - description: publishing prefix
+        in: path
+        name: prefix
+        required: true
+        schema:
+          type: string
+      - description: distribution name
+        in: path
+        name: distribution
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.publishedRepoUpdateParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.PublishedRepo"
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Published repository/component not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Update Published Repository
+      tags:
+      - Publish
+      x-codegen-request-body-name: request
+  /api/ready:
+    get:
+      description: |-
+        **Get aptly ready state**
+
+        Return aptly ready state:
+        - `Aptly is ready` (HTTP 200)
+        - `Aptly is unavailable` (HTTP 503)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.aptlyStatus"
+          description: Aptly is ready
+        "503":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.aptlyStatus"
+          description: Aptly is unavailable
+      summary: Get Ready State
+      tags:
+      - Status
+  /api/repos:
+    get:
+      description: |-
+        **Get list of available repos**
+        Each repo is returned as in “show” API.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/deb.LocalRepo"
+                type: array
+          description: OK
+      summary: List Repositories
+      tags:
+      - Repos
+    post:
+      description: |-
+        **Create a local repository**
+
+        Distribution and component are used as defaults when publishing repo either directly or via snapshot.
+
+        ```
+        $ curl -X POST -H 'Content-Type: application/json' --data '{"Name": "aptly-repo"}' http://localhost:8080/api/repos
+        {"Name":"aptly-repo","Comment":"","DefaultDistribution":"","DefaultComponent":""}
+        ```
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.repoCreateParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.LocalRepo"
+          description: Created
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Source snapshot not found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Local repo already exists
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal error
+      summary: Create Repository
+      tags:
+      - Repos
+      x-codegen-request-body-name: request
+  /api/repos/{name}:
+    delete:
+      description: |-
+        Drop/delete a repo
+        Cannot drop repos that are published.
+        Needs force=1 to drop repos used as source by other repos.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      - description: "force: 1 to enable"
+        in: query
+        name: force
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.ProcessReturnValue"
+          description: Repo object
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Repo Conflict
+      summary: Delete Repository
+      tags:
+      - Repos
+    get:
+      description: Returns basic information about local repository.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.LocalRepo"
+          description: OK
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Repository not found
+      summary: Get Repository Info
+      tags:
+      - Repos
+    put:
+      description: '**Update local repository meta information**'
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.reposEditParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.LocalRepo"
+          description: msg
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Update Repository
+      tags:
+      - Repos
+      x-codegen-request-body-name: request
+  /api/repos/{name}/copy/{src}/{file}:
+    post:
+      description: Copies a package from a source to destination repository
+      parameters:
+      - description: Destination repo
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Source repo
+        in: path
+        name: src
+        required: true
+        schema:
+          type: string
+      - description: File/packages to copy
+        in: path
+        name: file
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.ProcessReturnValue"
+          description: msg
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "422":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Unprocessable Entity
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Copy Package
+      tags:
+      - Repos
+  /api/repos/{name}/file/{dir}:
+    post:
+      description: |-
+        Import packages from files (uploaded using File Upload API) to the local repository. If directory specified, aptly would discover package files automatically.
+        Adding same package to local repository is not an error.
+        By default aptly would try to remove every successfully processed file and directory `dir` (if it becomes empty after import).
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Directory to add
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      - description: "when value is set to 1, don’t remove any files"
+        in: query
+        name: noRemove
+        schema:
+          type: string
+      - description: "when value is set to 1, remove packages conflicting with package\
+          \ being added (in local repository)"
+        in: query
+        name: forceReplace
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: wrong file
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Error adding files
+      summary: Add Uploaded Directory
+      tags:
+      - Repos
+  /api/repos/{name}/file/{dir}/{file}:
+    post:
+      description: |-
+        Import packages from files (uploaded using File Upload API) to the local repository. If directory specified, aptly would discover package files automatically.
+        Adding same package to local repository is not an error.
+        By default aptly would try to remove every successfully processed file and directory `dir` (if it becomes empty after import).
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Directory of packages
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      - description: Filename
+        in: path
+        name: file
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: wrong file
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Repository not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Error adding files
+      summary: Add Uploaded File
+      tags:
+      - Repos
+  /api/repos/{name}/include/{dir}:
+    post:
+      description: Allows automatic processing of .changes file controlling package
+        upload (uploaded using File Upload API) to the local repository. i.e. Exposes
+        repo include command in api.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Directory of packages
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      - description: "when value is set to 1, when adding package that conflicts with\
+          \ existing package, remove existing package"
+        in: query
+        name: forceReplace
+        schema:
+          type: integer
+      - description: "when value is set to 1, don’t remove files that have been imported\
+          \ successfully into repository"
+        in: query
+        name: noRemoveFiles
+        schema:
+          type: integer
+      - description: "when value is set to 1, accept unsigned .changes files"
+        in: query
+        name: acceptUnsigned
+        schema:
+          type: integer
+      - description: when value is set to 1 disable verification of .changes file
+          signature
+        in: query
+        name: ignoreSignature
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.reposIncludePackageFromDirResponse"
+          description: Response
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: Include Directory
+      tags:
+      - Repos
+  /api/repos/{name}/include/{dir}/{file}:
+    post:
+      description: Allows automatic processing of .changes file controlling package
+        upload (uploaded using File Upload API) to the local repository. i.e. Exposes
+        repo include command in api.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Directory of packages
+        in: path
+        name: dir
+        required: true
+        schema:
+          type: string
+      - description: File/packages to include
+        in: path
+        name: file
+        required: true
+        schema:
+          type: string
+      - description: "when value is set to 1, when adding package that conflicts with\
+          \ existing package, remove existing package"
+        in: query
+        name: forceReplace
+        schema:
+          type: integer
+      - description: "when value is set to 1, don’t remove files that have been imported\
+          \ successfully into repository"
+        in: query
+        name: noRemoveFiles
+        schema:
+          type: integer
+      - description: "when value is set to 1, accept unsigned .changes files"
+        in: query
+        name: acceptUnsigned
+        schema:
+          type: integer
+      - description: when value is set to 1 disable verification of .changes file
+          signature
+        in: query
+        name: ignoreSignature
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: Include File from Directory
+      tags:
+      - Repos
+  /api/repos/{name}/packages:
+    delete:
+      description: |-
+        **Remove packages from local repository by package keys.**
+
+        Any package(s) can be removed from a local repository. Package references from a local repository can be retrieved with GET /api/repos/:name/packages.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.reposPackagesAddDeleteParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: Delete Packages by Key
+      tags:
+      - Repos
+      x-codegen-request-body-name: request
+    get:
+      description: |-
+        **Return a list of packages present in the repo**
+
+        If `q` query parameter is missing, return all packages, otherwise return packages that match q
+
+        **Example:**
+        ```
+        $ curl http://localhost:8080/api/repos/aptly-repo/packages
+        ["Pi386 aptly 0.8 966561016b44ed80"]
+        ```
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Package query (e.g Name%20(~%20matlab))
+        in: query
+        name: q
+        required: true
+        schema:
+          type: string
+      - description: Set to 1 to include dependencies when evaluating package query
+        in: query
+        name: withDeps
+        required: true
+        schema:
+          type: string
+      - description: Set to 'details' to return extra info about each package
+        in: query
+        name: format
+        required: true
+        schema:
+          type: string
+      - description: Set to 1 to only return the highest version for each package
+          name
+        in: query
+        name: maximumVersion
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: List Repo Packages
+      tags:
+      - Repos
+    post:
+      description: |-
+        **Add packages to local repository by package keys.**
+
+        Any package can be added that is present in the aptly database (from any mirror, snapshot, local repository). This API combined with package list (search) APIs allows one to implement importing, copying, moving packages around.
+
+        API verifies that packages actually exist in aptly database and checks constraint that conflicting packages can’t be part of the same local repository.
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.reposPackagesAddDeleteParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: msg
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+      summary: Add Packages by Key
+      tags:
+      - Repos
+      x-codegen-request-body-name: request
+  /api/repos/{name}/snapshots:
+    post:
+      description: '**Create a snapshot of a repository by name**'
+      parameters:
+      - description: Repository name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsCreateFromRepositoryParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Created snapshot object
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Repo Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Snapshot Repository
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/s3:
+    get:
+      description: |-
+        **Get list of S3 buckets**
+
+        List configured S3 buckets.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: List of S3 buckets
+      summary: S3 buckets
+      tags:
+      - Status
+  /api/snapshots:
+    get:
+      description: |-
+        **Get list of snapshots**
+
+        Each snapshot is returned as in “show” API.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/deb.Snapshot"
+                type: array
+          description: OK
+      summary: List Snapshots
+      tags:
+      - Snapshots
+    post:
+      description: |-
+        **Create a snapshot from package refs**
+
+        Refs can be obtained from snapshots, local repos, or mirrors
+      parameters:
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsCreateParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Created snapshot
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Source snapshot or package refs not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Snapshot Packages
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/snapshots/{name}:
+    delete:
+      description: |-
+        **Delete snapshot by name**
+        Cannot drop snapshots that are published.
+        Needs force=1 to drop snapshots used as source by other snapshots.
+      parameters:
+      - description: Snapshot name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Force operation
+        in: query
+        name: force
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content: {}
+          description: ""
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot in use
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Delete Snapshot
+      tags:
+      - Snapshots
+    get:
+      description: '**Query detailed information about a snapshot by name**'
+      parameters:
+      - description: Name of the snapshot
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: msg
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Get Snapshot Info
+      tags:
+      - Snapshots
+    put:
+      description: "**Update snapshot metadata (Name, Description)**"
+      parameters:
+      - description: Snapshot name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsUpdateParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Updated snapshot object
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot Not Found
+        "409":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Conflicting snapshot
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Update Snapshot
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/snapshots/{name}/diff/{withSnapshot}:
+    get:
+      description: |-
+        **Return the diff between two snapshots (name & withSnapshot)**
+        Provide `onlyMatching=1` to return only packages present in both snapshots.
+        Otherwise, returns a `left` and `right` result providing packages only in the first and second snapshots
+      parameters:
+      - description: Snapshot name
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Snapshot name to diff against
+        in: path
+        name: withSnapshot
+        required: true
+        schema:
+          type: string
+      - description: Only return packages present in both snapshots
+        in: query
+        name: onlyMatching
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/deb.PackageDiff"
+                type: array
+          description: Package Diff
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: Snapshot diff
+      tags:
+      - Snapshots
+  /api/snapshots/{name}/merge:
+    post:
+      description: |-
+        **Merge several source snapshots into a new snapshot**
+
+        Merge happens from left to right. By default, packages with the same name-architecture pair are replaced during merge (package from latest snapshot on the list wins).
+
+        If only one snapshot is specified, merge copies source into destination.
+      parameters:
+      - description: Name of the snapshot to be created
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: merge only the latest version of each package
+        in: query
+        name: latest
+        schema:
+          type: integer
+      - description: all versions of packages are preserved during merge
+        in: query
+        name: no-remove
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsMergeParams"
+        description: Parameters
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Resulting snapshot object
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Snapshot Merge
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/snapshots/{name}/packages:
+    get:
+      description: |-
+        **List all packages in snapshot or perform search on snapshot contents and return results**
+        If `q` query parameter is missing, return all packages, otherwise return packages that match q
+      parameters:
+      - description: Snapshot to search
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: Package query (e.g Name%20(~%20matlab))
+        in: query
+        name: q
+        schema:
+          type: string
+      - description: Set to 1 to include dependencies when evaluating package query
+        in: query
+        name: withDeps
+        schema:
+          type: string
+      - description: Set to 'details' to return extra info about each package
+        in: query
+        name: format
+        schema:
+          type: string
+      - description: Set to 1 to only return the highest version for each package
+          name
+        in: query
+        name: maximumVersion
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  type: string
+                type: array
+          description: Package info
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Snapshot Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Server Error
+      summary: List Snapshot Packages
+      tags:
+      - Snapshots
+  /api/snapshots/{name}/pull:
+    post:
+      description: |-
+        **Pulls new packages and dependencies from a source snapshot into a new snapshot**
+
+        May also upgrade package versions if name snapshot already contains packages being pulled. New snapshot `Destination` is created as result of this process.
+        If architectures are limited (with config architectures or parameter `Architectures`, only mentioned architectures are processed, otherwise aptly will process all architectures in the snapshot.
+        If following dependencies by source is enabled (using dependencyFollowSource config), pulling binary packages would also pull corresponding source packages as well.
+        By default aptly would remove packages matching name and architecture while importing: e.g. when importing software_1.3_amd64, package software_1.2.9_amd64 would be removed.
+
+        With flag `no-remove` both package versions would stay in the snapshot.
+
+        Aptly pulls first package matching each of package queries, but with flag -all-matches all matching packages would be pulled.
+      parameters:
+      - description: Name of the snapshot to be created
+        in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      - description: "pull all the packages that satisfy the dependency version requirements\
+          \ (default is to pull first matching package): 1 to enable"
+        in: query
+        name: all-matches
+        schema:
+          type: integer
+      - description: "don’t create destination snapshot, just show what would be pulled:\
+          \ 1 to enable"
+        in: query
+        name: dry-run
+        schema:
+          type: integer
+      - description: "don’t process dependencies, just pull listed packages: 1 to\
+          \ enable"
+        in: query
+        name: no-deps
+        schema:
+          type: integer
+      - description: "don’t remove other package versions when pulling package: 1\
+          \ to enable"
+        in: query
+        name: no-remove
+        schema:
+          type: integer
+      - description: Run in background and return task object
+        in: query
+        name: _async
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.snapshotsPullParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/deb.Snapshot"
+          description: Resulting Snapshot object
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Snapshot Pull
+      tags:
+      - Snapshots
+      x-codegen-request-body-name: request
+  /api/storage:
+    get:
+      description: |-
+        **Get disk free information of aptly storage**
+
+        Units in MiB.
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.diskFree"
+          description: Storage information
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal Error
+      summary: Get Storage Utilization
+      tags:
+      - Status
+  /api/tasks:
+    get:
+      description: '**Get list of available tasks. Each task is returned as in “show”
+        API**'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/task.Task"
+                type: array
+          description: OK
+      summary: List Tasks
+      tags:
+      - Tasks
+  /api/tasks-clear:
+    post:
+      description: '**Removes finished and failed tasks from internal task list**'
+      responses:
+        "200":
+          content: {}
+          description: ""
+      summary: Clear Tasks
+      tags:
+      - Tasks
+  /api/tasks-wait:
+    get:
+      description: '**Waits for and returns when all running tasks are complete**'
+      responses:
+        "200":
+          content: {}
+          description: ""
+      summary: Wait for all Tasks
+      tags:
+      - Tasks
+  /api/tasks/{id}:
+    delete:
+      description: '**Delete completed task by given ID. Does not stop task execution**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.Task"
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Task in progress or not found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad ID?"
+      summary: Delete Task
+      tags:
+      - Tasks
+    get:
+      description: '**Return task information for a given ID**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/task.Task"
+          description: OK
+        "404":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Task Not Found
+        "500":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad id?"
+      summary: Get Task Info
+      tags:
+      - Tasks
+  /api/tasks/{id}/detail:
+    get:
+      description: '**Return task detail for a given ID**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: Task detail
+        "404":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Task Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad ID?"
+      summary: Get Task Details
+      tags:
+      - Tasks
+  /api/tasks/{id}/output:
+    get:
+      description: '**Return task output for a given ID**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: Task output
+        "404":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Task Not Found
+        "500":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad ID?"
+      summary: Get Task Output
+      tags:
+      - Tasks
+  /api/tasks/{id}/return_value:
+    get:
+      description: '**Return task return value (status code) by given ID**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: msg
+        "404":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Not Found
+        "500":
+          content:
+            text/plain:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad ID?"
+      summary: Get Task Return Value
+      tags:
+      - Tasks
+  /api/tasks/{id}/wait:
+    get:
+      description: '**Waits for and returns when given Task ID is complete**'
+      parameters:
+      - description: Task ID
+        in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/task.Task"
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Task Not Found
+        "500":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: "invalid syntax, bad id?"
+      summary: Wait for Task
+      tags:
+      - Tasks
+  /api/version:
+    get:
+      description: |-
+        **Get aptly version**
+
+        **Example:**
+        ```
+        $ curl http://localhost:8080/api/version
+        {"Version":"0.9~dev"}
+        ```
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.aptlyVersion"
+          description: OK
+      summary: Aptly Version
+      tags:
+      - Status
+  /api/{storage}/{pkgPath}:
+    get:
+      description: |-
+        If ServeInAPIMode is enabled in aptly config,
+        this api serves a specified package from storage
+      parameters:
+      - description: Storage
+        in: path
+        name: storage
+        required: true
+        schema:
+          type: string
+      - description: Package Path
+        in: path
+        name: pkgPath
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content: {}
+          description: ""
+      summary: Serve Packages
+      tags:
+      - Repos
+components:
+  schemas:
+    api.Error:
+      example:
+        error: error
+      properties:
+        error:
+          type: string
+      type: object
+    api.aptlyStatus:
+      example:
+        Status: "'Aptly is ready', 'Aptly is unavailable', 'Aptly is healthy'"
+      properties:
+        Status:
+          description: Aptly Status
+          example: "'Aptly is ready', 'Aptly is unavailable', 'Aptly is healthy'"
+          type: string
+      type: object
+    api.aptlyVersion:
+      example:
+        Version: Version
+      properties:
+        Version:
+          description: Aptly Version
+          type: string
+      type: object
+    api.diskFree:
+      example:
+        Total: 1
+        PercentFull: 6.027456183070403
+        Free: 0
+      properties:
+        Free:
+          description: "Available Storage [MiB]"
+          format: int64
+          type: integer
+        PercentFull:
+          description: Percentage Full
+          format: float32
+          type: number
+        Total:
+          description: "Storage size [MiB]"
+          format: int64
+          type: integer
+      type: object
+    api.gpgAddKeyParams:
+      properties:
+        GpgKeyArmor:
+          description: "Add ASCII armored gpg public key, do not download from keyserver"
+          example: ""
+          type: string
+        GpgKeyID:
+          description: "Keys do download from `Keyserver`, separated by space"
+          example: EF0F382A1A7B6500 8B48AD6246925553
+          type: string
+        Keyring:
+          description: "Keyring for adding the keys (default: trustedkeys.gpg)"
+          example: trustedkeys.gpg
+          type: string
+        Keyserver:
+          description: Keyserver to download keys provided in `GpgKeyID`
+          example: hkp://keyserver.ubuntu.com:80
+          type: string
+      type: object
+    api.mirrorCreateParams:
+      properties:
+        Architectures:
+          description: "Limit mirror to those architectures, if not specified aptly\
+            \ would fetch all architectures"
+          example:
+          - amd64
+          items:
+            type: string
+          type: array
+        ArchiveURL:
+          description: Url of the archive to mirror
+          example: http://deb.debian.org/debian
+          type: string
+        Components:
+          description: "Components to mirror, if not specified aptly would fetch all\
+            \ components"
+          example:
+          - main
+          items:
+            type: string
+          type: array
+        Distribution:
+          description: Distribution name to mirror
+          example: "'buster', for flat repositories use './'"
+          type: string
+        DownloadInstaller:
+          description: Set "true" to mirror installer files
+          type: boolean
+        DownloadSources:
+          description: Set "true" to mirror source packages
+          type: boolean
+        DownloadUdebs:
+          description: Set "true" to mirror udeb files
+          type: boolean
+        Filter:
+          description: Package query that is applied to mirror packages
+          example: xserver-xorg
+          type: string
+        FilterWithDeps:
+          description: Set "true" to include dependencies of matching packages when
+            filtering
+          type: boolean
+        IgnoreSignatures:
+          description: Set "true" to skip the verification of Release file signatures
+          type: boolean
+        Keyrings:
+          description: Gpg keyring(s) for verifying Release file
+          example:
+          - trustedkeys.gpg
+          items:
+            type: string
+          type: array
+        Name:
+          description: Name of mirror to be created
+          example: mirror2
+          type: string
+        SkipArchitectureCheck:
+          description: Set "true" to skip the verification of architectures
+          type: boolean
+        SkipComponentCheck:
+          description: Set "true" to skip if the given components are in the Release
+            file
+          type: boolean
+      required:
+      - ArchiveURL
+      - Name
+      type: object
+    api.mirrorUpdateParams:
+      properties:
+        ForceUpdate:
+          description: Set "true" to force a mirror update even if another process
+            is already updating the mirror (use with caution!)
+          type: boolean
+        IgnoreChecksums:
+          description: Set "true" to ignore checksum errors
+          type: boolean
+        IgnoreSignatures:
+          description: Set "true" to skip the verification of Release file signatures
+          type: boolean
+        Keyrings:
+          description: Gpg keyring(s) for verifing Release file
+          example:
+          - trustedkeys.gpg
+          items:
+            type: string
+          type: array
+        LatestOnly:
+          description: Set "true" to download only the latest version per package/architecture
+          type: boolean
+        Name:
+          description: Change mirror name to `Name`
+          example: mirror1
+          type: string
+        SkipExistingPackages:
+          description: Set "true" to skip downloading already downloaded packages
+          type: boolean
+      type: object
+    api.publishedRepoCreateParams:
+      properties:
+        AcquireByHash:
+          description: Provide index files by hash
+          example: false
+          type: boolean
+        Architectures:
+          description: Override list of published architectures
+          example:
+          - amd64
+          - armhf
+          items:
+            type: string
+          type: array
+        ButAutomaticUpgrades:
+          description: setting to yes excludes upgrades from the NotAutomic setting
+          example: ""
+          type: string
+        Distribution:
+          description: "Distribution name, if missing Aptly would try to guess from\
+            \ sources"
+          example: bookworm
+          type: string
+        ForceOverwrite:
+          description: "when publishing, overwrite files in pool/ directory without\
+            \ notice"
+          example: false
+          type: boolean
+        Label:
+          description: "Value of Label: field in published repository stanza"
+          example: ""
+          type: string
+        MultiDist:
+          description: Enable multiple packages with the same filename in different
+            distributions
+          example: false
+          type: boolean
+        NotAutomatic:
+          description: Setting to yes indicates to the package manager to not install
+            or upgrade packages from the repository without user consent
+          example: ""
+          type: string
+        Origin:
+          description: "Value of Origin: field in published repository stanza"
+          example: ""
+          type: string
+        SignedBy:
+          description: An optional field containing a comma separated list of OpenPGP
+            key fingerprints to be used for validating the next Release file.
+          example: ""
+          type: string
+        Signing:
+          allOf:
+          - $ref: "#/components/schemas/api.signingParams"
+          description: GPG options
+          type: object
+        SkipBz2:
+          description: Skip bz2 compression for index files
+          example: false
+          type: boolean
+        SkipCleanup:
+          description: Don't remove unreferenced files in prefix/component
+          example: false
+          type: boolean
+        SkipContents:
+          description: Don't generate contents indexes
+          example: false
+          type: boolean
+        SourceKind:
+          description: '''local'' for local repositories and ''snapshot'' for snapshots'
+          example: snapshot
+          type: string
+        Sources:
+          description: "List of 'Component/Name' objects, 'Name' is either local repository\
+            \ or snapshot name"
+          items:
+            $ref: "#/components/schemas/api.sourceParams"
+          type: array
+      required:
+      - SourceKind
+      - Sources
+      type: object
+    api.publishedRepoUpdateParams:
+      properties:
+        AcquireByHash:
+          description: Provide index files by hash
+          example: false
+          type: boolean
+        ForceOverwrite:
+          description: "when publishing, overwrite files in pool/ directory without\
+            \ notice"
+          example: false
+          type: boolean
+        Label:
+          description: "Value of Label: field in published repository stanza"
+          example: Debian
+          type: string
+        MultiDist:
+          description: Enable multiple packages with the same filename in different
+            distributions
+          example: false
+          type: boolean
+        Origin:
+          description: "Value of Origin: field in published repository stanza"
+          example: Debian
+          type: string
+        SignedBy:
+          description: An optional field containing a comma separated list of OpenPGP
+            key fingerprints to be used for validating the next Release file
+          example: ""
+          type: string
+        Signing:
+          allOf:
+          - $ref: "#/components/schemas/api.signingParams"
+          description: GPG options
+          type: object
+        SkipBz2:
+          description: Skip bz2 compression for index files
+          example: false
+          type: boolean
+        SkipCleanup:
+          description: Don't remove unreferenced files in prefix/component
+          example: false
+          type: boolean
+        SkipContents:
+          description: Don't generate contents indexes
+          example: false
+          type: boolean
+      type: object
+    api.publishedRepoUpdateSwitchParams:
+      properties:
+        AcquireByHash:
+          description: Provide index files by hash
+          example: false
+          type: boolean
+        ForceOverwrite:
+          description: "when publishing, overwrite files in pool/ directory without\
+            \ notice"
+          example: false
+          type: boolean
+        Label:
+          description: "Value of Label: field in published repository stanza"
+          example: Debian
+          type: string
+        MultiDist:
+          description: Enable multiple packages with the same filename in different
+            distributions
+          example: false
+          type: boolean
+        Origin:
+          description: "Value of Origin: field in published repository stanza"
+          example: Debian
+          type: string
+        SignedBy:
+          description: An optional field containing a comma separated list of OpenPGP
+            key fingerprints to be used for validating the next Release file
+          example: ""
+          type: string
+        Signing:
+          allOf:
+          - $ref: "#/components/schemas/api.signingParams"
+          description: GPG options
+          type: object
+        SkipBz2:
+          description: Skip bz2 compression for index files
+          example: false
+          type: boolean
+        SkipCleanup:
+          description: Don't remove unreferenced files in prefix/component
+          example: false
+          type: boolean
+        SkipContents:
+          description: Don't generate contents indexes
+          example: false
+          type: boolean
+        Snapshots:
+          description: "only when updating published snapshots, list of objects 'Component/Name'"
+          items:
+            $ref: "#/components/schemas/api.sourceParams"
+          type: array
+      type: object
+    api.repoCreateParams:
+      properties:
+        Comment:
+          description: Text describing the repository (optional)
+          example: this is a repo
+          type: string
+        DefaultComponent:
+          description: Default component when publishing from this local repo
+          example: main
+          type: string
+        DefaultDistribution:
+          description: Default distribution when publishing from this local repo
+          example: stable
+          type: string
+        FromSnapshot:
+          description: Snapshot name to create repoitory from (optional)
+          example: ""
+          type: string
+        Name:
+          description: Name of repository to create
+          example: repo1
+          type: string
+      required:
+      - Name
+      type: object
+    api.reposEditParams:
+      properties:
+        Comment:
+          description: Change Comment of repository
+          example: example repo
+          type: string
+        DefaultComponent:
+          description: Change Devault Component for publishing
+          example: ""
+          type: string
+        DefaultDistribution:
+          description: Change Default Distribution for publishing
+          example: ""
+          type: string
+        Name:
+          description: Name of repository to modify
+          example: repo1
+          type: string
+      required:
+      - Name
+      type: object
+    api.reposIncludePackageFromDirResponse:
+      example:
+        Report:
+          Added:
+          - Added
+          - Added
+          Removed:
+          - Removed
+          - Removed
+          Warnings:
+          - Warnings
+          - Warnings
+        FailedFiles:
+        - FailedFiles
+        - FailedFiles
+      properties:
+        FailedFiles:
+          items:
+            type: string
+          type: array
+        Report:
+          $ref: "#/components/schemas/aptly.RecordingResultReporter"
+      type: object
+    api.reposPackagesAddDeleteParams:
+      properties:
+        PackageRefs:
+          description: Package Refs
+          example:
+          - ""
+          items:
+            type: string
+          type: array
+      required:
+      - PackageRefs
+      type: object
+    api.signingParams:
+      properties:
+        GpgKey:
+          description: "GPG key ID(s) to use when signing the release, separated by\
+            \ comma, and if not specified, default configured key(s) are used"
+          example: "KEY_ID_a, KEY_ID_b"
+          type: string
+        Keyring:
+          description: GPG keyring to use (instead of default)
+          example: trustedkeys.gpg
+          type: string
+        Passphrase:
+          description: GPG passphrase to unlock private key (possibly insecure)
+          example: verysecure
+          type: string
+        PassphraseFile:
+          description: GPG passphrase file to unlock private key (possibly insecure)
+          example: /etc/aptly.passphrase
+          type: string
+        SecretKeyring:
+          description: "GPG secret keyring to use (instead of default) Note: depreciated\
+            \ with gpg2"
+          example: ""
+          type: string
+        Skip:
+          description: Don't sign published repository
+          example: false
+          type: boolean
+      type: object
+    api.snapshotsCreateFromMirrorParams:
+      properties:
+        Description:
+          description: Description of snapshot
+          type: string
+        Name:
+          description: Name of snapshot to create
+          example: snap1
+          type: string
+      required:
+      - Name
+      type: object
+    api.snapshotsCreateFromRepositoryParams:
+      properties:
+        Description:
+          description: Description of snapshot
+          type: string
+        Name:
+          description: Name of snapshot to create
+          example: snap1
+          type: string
+      required:
+      - Name
+      type: object
+    api.snapshotsCreateParams:
+      properties:
+        Description:
+          description: Description of snapshot
+          type: string
+        Name:
+          description: Name of snapshot to create
+          example: snap2
+          type: string
+        PackageRefs:
+          description: List of package refs
+          example:
+          - ""
+          items:
+            type: string
+          type: array
+        SourceSnapshots:
+          description: List of source snapshots
+          example:
+          - snap1
+          items:
+            type: string
+          type: array
+      required:
+      - Name
+      type: object
+    api.snapshotsMergeParams:
+      properties:
+        Sources:
+          description: List of snapshot names to be merged
+          example:
+          - snapshot1
+          items:
+            type: string
+          type: array
+      required:
+      - Sources
+      type: object
+    api.snapshotsPullParams:
+      properties:
+        Architectures:
+          description: List of architectures (optional)
+          example:
+          - amd64
+          - ' armhf'
+          items:
+            type: string
+          type: array
+        Destination:
+          description: Name of the snapshot to be created
+          example: idestination-snapshot
+          type: string
+        Queries:
+          description: List of package queries (i.e. name of package to be pulled
+            from `Source`)
+          example:
+          - xserver-xorg
+          items:
+            type: string
+          type: array
+        Source:
+          description: Source name to be searched for packages and dependencies
+          example: source-snapshot
+          type: string
+      required:
+      - Destination
+      - Queries
+      - Source
+      type: object
+    api.snapshotsUpdateParams:
+      properties:
+        Description:
+          description: Change Description of snapshot
+          type: string
+        Name:
+          description: Change Name of snapshot
+          example: snap2
+          type: string
+      type: object
+    api.sourceParams:
+      properties:
+        Component:
+          description: Name of the component
+          example: main
+          type: string
+        Name:
+          description: Name of the local repository/snapshot
+          example: snap1
+          type: string
+      required:
+      - Component
+      - Name
+      type: object
+    aptly.RecordingResultReporter:
+      example:
+        Added:
+        - Added
+        - Added
+        Removed:
+        - Removed
+        - Removed
+        Warnings:
+        - Warnings
+        - Warnings
+      properties:
+        Added:
+          items:
+            type: string
+          type: array
+        Removed:
+          items:
+            type: string
+          type: array
+        Warnings:
+          items:
+            type: string
+          type: array
+      type: object
+    deb.LocalRepo:
+      example:
+        Comment: Comment
+        DefaultComponent: DefaultComponent
+        DefaultDistribution: DefaultDistribution
+        Name: Name
+      properties:
+        Comment:
+          description: Comment
+          type: string
+        DefaultComponent:
+          description: DefaultComponent
+          type: string
+        DefaultDistribution:
+          description: DefaultDistribution
+          type: string
+        Name:
+          description: User-assigned name
+          type: string
+      type: object
+    deb.Package:
+      example:
+        IsSource: true
+        Architecture: Architecture
+        Version: Version
+        FilesHash: 0
+        IsUdeb: true
+        V06Plus: true
+        IsInstaller: true
+        Provides:
+        - Provides
+        - Provides
+        Source: Source
+        Name: Name
+        SourceArchitecture: SourceArchitecture
+      properties:
+        Architecture:
+          type: string
+        FilesHash:
+          description: Hash of files section
+          format: int64
+          type: integer
+        IsInstaller:
+          description: Is this package a dummy installer package
+          type: boolean
+        IsSource:
+          description: Is this source package
+          type: boolean
+        IsUdeb:
+          description: Is this udeb package
+          type: boolean
+        Name:
+          description: Basic package properties
+          type: string
+        Provides:
+          description: List of virtual packages this package provides
+          items:
+            type: string
+          type: array
+        Source:
+          description: "For binary package, name of source package"
+          type: string
+        SourceArchitecture:
+          description: |-
+            If this source package, this field holds "real" architecture value,
+            while Architecture would be equal to "source"
+          type: string
+        V06Plus:
+          description: Is this >= 0.6 package?
+          type: boolean
+        Version:
+          type: string
+      type: object
+    deb.PackageDiff:
+      example:
+        Left:
+          IsSource: true
+          Architecture: Architecture
+          Version: Version
+          FilesHash: 0
+          IsUdeb: true
+          V06Plus: true
+          IsInstaller: true
+          Provides:
+          - Provides
+          - Provides
+          Source: Source
+          Name: Name
+          SourceArchitecture: SourceArchitecture
+        Right:
+          IsSource: true
+          Architecture: Architecture
+          Version: Version
+          FilesHash: 0
+          IsUdeb: true
+          V06Plus: true
+          IsInstaller: true
+          Provides:
+          - Provides
+          - Provides
+          Source: Source
+          Name: Name
+          SourceArchitecture: SourceArchitecture
+      properties:
+        Left:
+          $ref: "#/components/schemas/deb.Package"
+        Right:
+          $ref: "#/components/schemas/deb.Package"
+      type: object
+    deb.PublishedRepo:
+      example:
+        Origin: Origin
+        SourceKind: SourceKind
+        SignedBy: SignedBy
+        SourceUUID: SourceUUID
+        MultiDist: true
+        AcquireByHash: true
+        Label: Label
+        Prefix: Prefix
+        SkipBz2: true
+        Sources:
+          key: Sources
+        SkipContents: true
+        Suite: Suite
+        Codename: Codename
+        Storage: Storage
+        Revision: "{}"
+        Distribution: Distribution
+        ButAutomaticUpgrades: ButAutomaticUpgrades
+        Component: Component
+        UUID: UUID
+        NotAutomatic: NotAutomatic
+        Architectures:
+        - Architectures
+        - Architectures
+      properties:
+        AcquireByHash:
+          description: Provide index files per hash also
+          type: boolean
+        Architectures:
+          description: Architectures is a list of all architectures published
+          items:
+            type: string
+          type: array
+        ButAutomaticUpgrades:
+          type: string
+        Codename:
+          type: string
+        Component:
+          description: Legacy fields for compatibility with old published repositories
+            (< 0.6)
+          type: string
+        Distribution:
+          type: string
+        Label:
+          type: string
+        MultiDist:
+          description: Support multiple distributions
+          type: boolean
+        NotAutomatic:
+          type: string
+        Origin:
+          type: string
+        Prefix:
+          type: string
+        Revision:
+          allOf:
+          - $ref: "#/components/schemas/deb.PublishedRepoRevision"
+          description: Revision
+          type: object
+        SignedBy:
+          description: |-
+            An optional field containing a comma separated list
+            of OpenPGP key fingerprints to be used
+            for validating the next Release file
+          type: string
+        SkipBz2:
+          description: Skip bz2 compression for index files
+          type: boolean
+        SkipContents:
+          description: Skip contents generation
+          type: boolean
+        SourceKind:
+          description: SourceKind is "local"/"repo"
+          type: string
+        SourceUUID:
+          description: SourceUUID is UUID of either snapshot or local repo
+          type: string
+        Sources:
+          additionalProperties:
+            type: string
+          description: "Map of sources by each component: component name -> source\
+            \ UUID"
+          type: object
+        Storage:
+          description: Storage & Prefix & distribution should be unique across all
+            published repositories
+          type: string
+        Suite:
+          type: string
+        UUID:
+          description: Internal unique ID
+          type: string
+      type: object
+    deb.PublishedRepoRevision:
+      properties:
+        Sources:
+          additionalProperties:
+            type: string
+          description: "Map of sources: component name -> snapshot name/local repo\
+            \ Name"
+          type: object
+      type: object
+    deb.RemoteRepo:
+      example:
+        Status: 0
+        Meta: "{}"
+        SkipComponentCheck: true
+        WorkerPID: 6
+        DownloadSources: true
+        FilterWithDeps: true
+        DownloadUdebs: true
+        Name: Name
+        Components:
+        - Components
+        - Components
+        ArchiveRoot: ArchiveRoot
+        SkipArchitectureCheck: true
+        Filter: Filter
+        Packages:
+        - Packages
+        - Packages
+        Distribution: Distribution
+        DownloadInstaller: true
+        LastDownloadDate: LastDownloadDate
+        UUID: UUID
+        Architectures:
+        - Architectures
+        - Architectures
+      properties:
+        Architectures:
+          description: "List of architectures to fetch, if empty, then fetch all architectures"
+          items:
+            type: string
+          type: array
+        ArchiveRoot:
+          description: "Root of Debian archive, URL"
+          type: string
+        Components:
+          description: "List of components to fetch, if empty, then fetch all components"
+          items:
+            type: string
+          type: array
+        Distribution:
+          description: "Distribution name, e.g. squeeze"
+          type: string
+        DownloadInstaller:
+          description: Should we download installer files?
+          type: boolean
+        DownloadSources:
+          description: Should we download sources?
+          type: boolean
+        DownloadUdebs:
+          description: Should we download .udebs?
+          type: boolean
+        Filter:
+          description: Filter for packages
+          type: string
+        FilterWithDeps:
+          description: FilterWithDeps to include dependencies from filter query
+          type: boolean
+        LastDownloadDate:
+          description: Last update date
+          type: string
+        Meta:
+          allOf:
+          - $ref: "#/components/schemas/deb.Stanza"
+          description: Meta-information about repository
+          type: object
+        Name:
+          description: User-assigned name
+          type: string
+        Packages:
+          description: Packages for json output
+          items:
+            type: string
+          type: array
+        SkipArchitectureCheck:
+          description: SkipArchitectureCheck skips architecture list verification
+          type: boolean
+        SkipComponentCheck:
+          description: SkipComponentCheck skips component list verification
+          type: boolean
+        Status:
+          description: "Status marks state of repository (being updated, no action)"
+          type: integer
+        UUID:
+          description: Permanent internal ID
+          type: string
+        WorkerPID:
+          description: WorkerPID is PID of the process modifying the mirror (if any)
+          type: integer
+      type: object
+    deb.Snapshot:
+      example:
+        Origin: Origin
+        SourceKind: SourceKind
+        Description: Description
+        Packages:
+        - Packages
+        - Packages
+        CreatedAt: CreatedAt
+        ButAutomaticUpgrades: ButAutomaticUpgrades
+        RemoteRepos:
+        - Status: 0
+          Meta: "{}"
+          SkipComponentCheck: true
+          WorkerPID: 6
+          DownloadSources: true
+          FilterWithDeps: true
+          DownloadUdebs: true
+          Name: Name
+          Components:
+          - Components
+          - Components
+          ArchiveRoot: ArchiveRoot
+          SkipArchitectureCheck: true
+          Filter: Filter
+          Packages:
+          - Packages
+          - Packages
+          Distribution: Distribution
+          DownloadInstaller: true
+          LastDownloadDate: LastDownloadDate
+          UUID: UUID
+          Architectures:
+          - Architectures
+          - Architectures
+        - Status: 0
+          Meta: "{}"
+          SkipComponentCheck: true
+          WorkerPID: 6
+          DownloadSources: true
+          FilterWithDeps: true
+          DownloadUdebs: true
+          Name: Name
+          Components:
+          - Components
+          - Components
+          ArchiveRoot: ArchiveRoot
+          SkipArchitectureCheck: true
+          Filter: Filter
+          Packages:
+          - Packages
+          - Packages
+          Distribution: Distribution
+          DownloadInstaller: true
+          LastDownloadDate: LastDownloadDate
+          UUID: UUID
+          Architectures:
+          - Architectures
+          - Architectures
+        NotAutomatic: NotAutomatic
+        Snapshots:
+        - null
+        - null
+        LocalRepos:
+        - Comment: Comment
+          DefaultComponent: DefaultComponent
+          DefaultDistribution: DefaultDistribution
+          Name: Name
+        - Comment: Comment
+          DefaultComponent: DefaultComponent
+          DefaultDistribution: DefaultDistribution
+          Name: Name
+        Name: Name
+      properties:
+        ButAutomaticUpgrades:
+          type: string
+        CreatedAt:
+          description: Date of creation
+          type: string
+        Description:
+          description: Description of how snapshot was created
+          type: string
+        LocalRepos:
+          items:
+            $ref: "#/components/schemas/deb.LocalRepo"
+          type: array
+        Name:
+          description: Human-readable name
+          type: string
+        NotAutomatic:
+          type: string
+        Origin:
+          type: string
+        Packages:
+          items:
+            type: string
+          type: array
+        RemoteRepos:
+          items:
+            $ref: "#/components/schemas/deb.RemoteRepo"
+          type: array
+        Snapshots:
+          description: Sources
+          items:
+            $ref: "#/components/schemas/deb.Snapshot"
+          type: array
+        SourceKind:
+          description: "Source: kind + ID"
+          type: string
+      type: object
+    deb.SourceEntry:
+      example:
+        Component: Component
+        Name: Name
+      properties:
+        Component:
+          type: string
+        Name:
+          type: string
+      type: object
+    deb.Stanza:
+      additionalProperties:
+        type: string
+      type: object
+    github_com_aptly-dev_aptly_deb.RemoteRepo:
+      example:
+        Status: 0
+        Meta: "{}"
+        SkipComponentCheck: true
+        WorkerPID: 6
+        DownloadSources: true
+        FilterWithDeps: true
+        DownloadUdebs: true
+        Name: Name
+        Components:
+        - Components
+        - Components
+        ArchiveRoot: ArchiveRoot
+        SkipArchitectureCheck: true
+        Filter: Filter
+        Packages:
+        - Packages
+        - Packages
+        Distribution: Distribution
+        DownloadInstaller: true
+        LastDownloadDate: LastDownloadDate
+        UUID: UUID
+        Architectures:
+        - Architectures
+        - Architectures
+      properties:
+        Architectures:
+          description: "List of architectures to fetch, if empty, then fetch all architectures"
+          items:
+            type: string
+          type: array
+        ArchiveRoot:
+          description: "Root of Debian archive, URL"
+          type: string
+        Components:
+          description: "List of components to fetch, if empty, then fetch all components"
+          items:
+            type: string
+          type: array
+        Distribution:
+          description: "Distribution name, e.g. squeeze"
+          type: string
+        DownloadInstaller:
+          description: Should we download installer files?
+          type: boolean
+        DownloadSources:
+          description: Should we download sources?
+          type: boolean
+        DownloadUdebs:
+          description: Should we download .udebs?
+          type: boolean
+        Filter:
+          description: Filter for packages
+          type: string
+        FilterWithDeps:
+          description: FilterWithDeps to include dependencies from filter query
+          type: boolean
+        LastDownloadDate:
+          description: Last update date
+          type: string
+        Meta:
+          allOf:
+          - $ref: "#/components/schemas/deb.Stanza"
+          description: Meta-information about repository
+          type: object
+        Name:
+          description: User-assigned name
+          type: string
+        Packages:
+          description: Packages for json output
+          items:
+            type: string
+          type: array
+        SkipArchitectureCheck:
+          description: SkipArchitectureCheck skips architecture list verification
+          type: boolean
+        SkipComponentCheck:
+          description: SkipComponentCheck skips component list verification
+          type: boolean
+        Status:
+          description: "Status marks state of repository (being updated, no action)"
+          type: integer
+        UUID:
+          description: Permanent internal ID
+          type: string
+        WorkerPID:
+          description: WorkerPID is PID of the process modifying the mirror (if any)
+          type: integer
+      type: object
+    github_com_aptly-dev_aptly_task.ProcessReturnValue:
+      example:
+        Value: "{}"
+        Code: 0
+      properties:
+        Code:
+          type: integer
+        Value:
+          type: object
+      type: object
+    task.ProcessReturnValue:
+      example:
+        Value: "{}"
+        Code: 0
+      properties:
+        Code:
+          type: integer
+        Value:
+          type: object
+      type: object
+    task.State:
+      enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      type: integer
+      x-enum-varnames:
+      - IDLE
+      - RUNNING
+      - SUCCEEDED
+      - FAILED
+    task.Task:
+      example:
+        State: 1
+        ID: 6
+        Name: Name
+      properties:
+        ID:
+          type: integer
+        Name:
+          type: string
+        State:
+          $ref: "#/components/schemas/task.State"
+      type: object
+    _api_files__dir__post_request:
+      properties:
+        files:
+          description: Files to upload
+          format: binary
+          type: string
+      required:
+      - files
+      type: object
+x-original-swagger-version: "2.0"
