@@ -25,7 +25,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api"
+	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
 )
 
 func main() {

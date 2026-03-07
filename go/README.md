@@ -32,7 +32,7 @@ go get golang.org/x/net/context
 Put the package under your project folder and add the following in import:
 
 ```go
-import aptly "github.com/daedaluz/aptly-api"
+import aptly "github.com/daedaluz/aptly-api/go/aptly"
 ```
 
 To use a proxy, set the environment variable `HTTP_PROXY`:
