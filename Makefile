@@ -9,7 +9,8 @@ GENERATOR_IMAGE := openapitools/openapi-generator-cli
 
 update: $(SWAGGER_JSON)
 	docker run --rm -u $(shell id -u):$(shell id -g) -v $(CURDIR):/work -w /work $(GENERATOR_IMAGE) generate \
-		-i /work/$(SWAGGER_JSON) -g go -o /work/go/aptly --package-name aptly --git-repo-id aptly-api --git-user-id daedaluz -p moduleName=github.com/daedaluz/aptly-api/go
+		-i /work/$(SWAGGER_JSON) -g go -o /work/go/aptly --package-name aptly --git-repo-id aptly-api --git-user-id daedaluz -p moduleName=github.com/daedaluz/aptly-api
+	rm -f go/aptly/go.mod go/aptly/go.sum
 	docker run --rm -u $(shell id -u):$(shell id -g) -v $(CURDIR):/work -w /work $(GENERATOR_IMAGE) generate \
 		-i /work/$(SWAGGER_JSON) -g typescript-fetch -o /work/ts
 	rm -rf $(APTLY_SRC)
