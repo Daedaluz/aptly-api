@@ -1,0 +1,22 @@
+[package]
+name = "aptly-api"
+version = "1.6.2+20260228114657.9defe70"
+authors = ["OpenAPI Generator team and contributors"]
+description = "Aptly operations are also available via REST API served with `aptly api serve`.  On Debian based systems, a package `aptly-api` is available, which will run aptly as systemd service as dedicated aptly-api user.  Some configuration changes (S3 publishing endpoints, ...) will require restarting the aptly service in order to take effect.  The REST API shouldn't be exposed to the Internet as there is no authentication/protection, consider using a HTTP proxy (e.g. nginx) to add https and authentication.  #### Aptly REST API Documentation "
+# Override this license by providing a License Object in the OpenAPI.
+license = "Unlicense"
+edition = "2021"
+
+[dependencies]
+serde = { version = "^1.0", features = ["derive"] }
+serde_json = "^1.0"
+serde_repr = "^0.1"
+url = "^2.5"
+tokio = { version = "^1.46.0", features = ["fs"] }
+tokio-util = { version = "^0.7", features = ["codec"] }
+reqwest = { version = "^0.13", default-features = false, features = ["json", "multipart", "stream", "query", "form"] }
+
+[features]
+default = ["native-tls"]
+native-tls = ["reqwest/native-tls"]
+rustls = ["reqwest/rustls"]

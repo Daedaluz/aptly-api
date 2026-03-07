@@ -13,6 +13,8 @@ update: $(SWAGGER_JSON)
 	rm -f go/aptly/go.mod go/aptly/go.sum
 	docker run --rm -u $(shell id -u):$(shell id -g) -v $(CURDIR):/work -w /work $(GENERATOR_IMAGE) generate \
 		-i /work/$(SWAGGER_JSON) -g typescript-fetch -o /work/ts
+	docker run --rm -u $(shell id -u):$(shell id -g) -v $(CURDIR):/work -w /work $(GENERATOR_IMAGE) generate \
+		-i /work/$(SWAGGER_JSON) -g rust -o /work/rust/aptly --package-name aptly-api --git-repo-id aptly-api --git-user-id daedaluz
 	rm -rf $(APTLY_SRC)
 
 $(SWAGGER_JSON): | $(APTLY_SRC)
@@ -22,4 +24,4 @@ $(APTLY_SRC):
 	git clone --depth 1 --branch $(APTLY_VERSION) $(APTLY_REPO) $(APTLY_SRC)
 
 clean:
-	rm -rf $(APTLY_SRC) go ts
+	rm -rf $(APTLY_SRC) go ts rust
