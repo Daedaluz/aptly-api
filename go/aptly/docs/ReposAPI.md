@@ -38,7 +38,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -99,7 +99,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -177,7 +177,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -251,7 +251,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -329,7 +329,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -408,7 +408,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -478,7 +478,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -564,7 +564,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -647,7 +647,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -721,7 +721,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -799,7 +799,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -873,7 +873,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -945,7 +945,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {
@@ -1011,7 +1011,7 @@ import (
 	"context"
 	"fmt"
 	"os"
-	openapiclient "github.com/daedaluz/aptly-api/go/aptly"
+	openapiclient "github.com/daedaluz/aptly-api"
 )
 
 func main() {

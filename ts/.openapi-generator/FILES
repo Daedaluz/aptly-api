@@ -1,3 +1,4 @@
+.openapi-generator-ignore
 apis/DatabaseApi.ts
 apis/FilesApi.ts
 apis/MirrorsApi.ts
