@@ -13,6 +13,8 @@ docs/ApiAptlyVersion.md
 docs/ApiDiskFree.md
 docs/ApiError.md
 docs/ApiGpgAddKeyParams.md
+docs/ApiGpgDeleteKeyParams.md
+docs/ApiGpgKeyInfo.md
 docs/ApiMirrorCreateParams.md
 docs/ApiMirrorUpdateParams.md
 docs/ApiPublishedRepoCreateParams.md
@@ -59,6 +61,8 @@ models/ApiAptlyVersion.ts
 models/ApiDiskFree.ts
 models/ApiError.ts
 models/ApiGpgAddKeyParams.ts
+models/ApiGpgDeleteKeyParams.ts
+models/ApiGpgKeyInfo.ts
 models/ApiMirrorCreateParams.ts
 models/ApiMirrorUpdateParams.ts
 models/ApiPublishedRepoCreateParams.ts

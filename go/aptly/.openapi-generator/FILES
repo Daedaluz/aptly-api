@@ -18,6 +18,8 @@ docs/ApiAptlyVersion.md
 docs/ApiDiskFree.md
 docs/ApiError.md
 docs/ApiGpgAddKeyParams.md
+docs/ApiGpgDeleteKeyParams.md
+docs/ApiGpgKeyInfo.md
 docs/ApiMirrorCreateParams.md
 docs/ApiMirrorUpdateParams.md
 docs/ApiPublishedRepoCreateParams.md
@@ -66,6 +68,8 @@ model_api_aptly_version.go
 model_api_disk_free.go
 model_api_error.go
 model_api_gpg_add_key_params.go
+model_api_gpg_delete_key_params.go
+model_api_gpg_key_info.go
 model_api_mirror_create_params.go
 model_api_mirror_update_params.go
 model_api_published_repo_create_params.go

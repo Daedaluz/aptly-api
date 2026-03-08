@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 Method | HTTP request | Description
 ------------- | ------------- | -------------
 [**api_packages_get**](PackagesApi.md#api_packages_get) | **GET** /api/packages | List Packages
+[**api_packages_key_file_get**](PackagesApi.md#api_packages_key_file_get) | **GET** /api/packages/{key}/file | Download Package File
 [**api_packages_key_get**](PackagesApi.md#api_packages_key_get) | **GET** /api/packages/{key} | Get Package Info
 
 
@@ -36,6 +37,36 @@ No authorization required
 
 - **Content-Type**: Not defined
 - **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+
+## api_packages_key_file_get
+
+> std::path::PathBuf api_packages_key_file_get(key)
+Download Package File
+
+**Download a package file directly from the pool by package key** Serves the first (primary) file associated with the package.
+
+### Parameters
+
+
+Name | Type | Description  | Required | Notes
+------------- | ------------- | ------------- | ------------- | -------------
+**key** | **String** | package key (unique package identifier) | [required] |
+
+### Return type
+
+[**std::path::PathBuf**](std::path::PathBuf.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/octet-stream
 
 [[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 

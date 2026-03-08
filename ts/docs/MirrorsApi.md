@@ -4,6 +4,8 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**apiGpgKeyDelete**](MirrorsApi.md#apigpgkeydelete) | **DELETE** /api/gpg/key | Delete GPG Keys |
+| [**apiGpgKeyGet**](MirrorsApi.md#apigpgkeyget) | **GET** /api/gpg/key | List GPG Keys |
 | [**apiGpgKeyPost**](MirrorsApi.md#apigpgkeypost) | **POST** /api/gpg/key | Add GPG Keys |
 | [**apiMirrorsGet**](MirrorsApi.md#apimirrorsget) | **GET** /api/mirrors | List Mirrors |
 | [**apiMirrorsNameDelete**](MirrorsApi.md#apimirrorsnamedelete) | **DELETE** /api/mirrors/{name} | Delete Mirror |
@@ -12,6 +14,142 @@ All URIs are relative to *http://localhost*
 | [**apiMirrorsNamePut**](MirrorsApi.md#apimirrorsnameput) | **PUT** /api/mirrors/{name} | Update Mirror |
 | [**apiMirrorsPost**](MirrorsApi.md#apimirrorspost) | **POST** /api/mirrors | Create Mirror |
 
+
+
+## apiGpgKeyDelete
+
+> string apiGpgKeyDelete(request)
+
+Delete GPG Keys
+
+**Remove public keys from the aptly keyring**
+
+### Example
+
+```ts
+import {
+  Configuration,
+  MirrorsApi,
+} from '';
+import type { ApiGpgKeyDeleteRequest } from '';
+
+async function example() {
+  console.log("🚀 Testing  SDK...");
+  const api = new MirrorsApi();
+
+  const body = {
+    // ApiGpgDeleteKeyParams | Parameters
+    request: ...,
+  } satisfies ApiGpgKeyDeleteRequest;
+
+  try {
+    const data = await api.apiGpgKeyDelete(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **request** | [ApiGpgDeleteKeyParams](ApiGpgDeleteKeyParams.md) | Parameters | |
+
+### Return type
+
+**string**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
+| **400** | Bad Request |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## apiGpgKeyGet
+
+> Array&lt;ApiGpgKeyInfo&gt; apiGpgKeyGet(keyring)
+
+List GPG Keys
+
+**List public keys in the aptly keyring with structured metadata and armored keys**
+
+### Example
+
+```ts
+import {
+  Configuration,
+  MirrorsApi,
+} from '';
+import type { ApiGpgKeyGetRequest } from '';
+
+async function example() {
+  console.log("🚀 Testing  SDK...");
+  const api = new MirrorsApi();
+
+  const body = {
+    // string | keyring to list keys from (default: trustedkeys.gpg) (optional)
+    keyring: keyring_example,
+  } satisfies ApiGpgKeyGetRequest;
+
+  try {
+    const data = await api.apiGpgKeyGet(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **keyring** | `string` | keyring to list keys from (default: trustedkeys.gpg) | [Optional] [Defaults to `undefined`] |
+
+### Return type
+
+[**Array&lt;ApiGpgKeyInfo&gt;**](ApiGpgKeyInfo.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | List of GPG keys |  -  |
+| **400** | Bad Request |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## apiGpgKeyPost

@@ -5,6 +5,7 @@ All URIs are relative to *http://localhost*
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
 | [**apiPackagesGet**](PackagesApi.md#apipackagesget) | **GET** /api/packages | List Packages |
+| [**apiPackagesKeyFileGet**](PackagesApi.md#apipackageskeyfileget) | **GET** /api/packages/{key}/file | Download Package File |
 | [**apiPackagesKeyGet**](PackagesApi.md#apipackageskeyget) | **GET** /api/packages/{key} | Get Package Info |
 
 
@@ -75,6 +76,75 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | List of packages |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## apiPackagesKeyFileGet
+
+> Blob apiPackagesKeyFileGet(key)
+
+Download Package File
+
+**Download a package file directly from the pool by package key** Serves the first (primary) file associated with the package.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  PackagesApi,
+} from '';
+import type { ApiPackagesKeyFileGetRequest } from '';
+
+async function example() {
+  console.log("🚀 Testing  SDK...");
+  const api = new PackagesApi();
+
+  const body = {
+    // string | package key (unique package identifier)
+    key: key_example,
+  } satisfies ApiPackagesKeyFileGetRequest;
+
+  try {
+    const data = await api.apiPackagesKeyFileGet(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **key** | `string` | package key (unique package identifier) | [Defaults to `undefined`] |
+
+### Return type
+
+**Blob**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/octet-stream`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | Package file content |  -  |
+| **404** | Package not found or has no files |  -  |
+| **500** | Internal error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 

@@ -5,6 +5,8 @@ export * from './ApiAptlyVersion';
 export * from './ApiDiskFree';
 export * from './ApiError';
 export * from './ApiGpgAddKeyParams';
+export * from './ApiGpgDeleteKeyParams';
+export * from './ApiGpgKeyInfo';
 export * from './ApiMirrorCreateParams';
 export * from './ApiMirrorUpdateParams';
 export * from './ApiPublishedRepoCreateParams';

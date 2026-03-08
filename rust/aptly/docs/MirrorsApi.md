@@ -4,6 +4,8 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**api_gpg_key_delete**](MirrorsApi.md#api_gpg_key_delete) | **DELETE** /api/gpg/key | Delete GPG Keys
+[**api_gpg_key_get**](MirrorsApi.md#api_gpg_key_get) | **GET** /api/gpg/key | List GPG Keys
 [**api_gpg_key_post**](MirrorsApi.md#api_gpg_key_post) | **POST** /api/gpg/key | Add GPG Keys
 [**api_mirrors_get**](MirrorsApi.md#api_mirrors_get) | **GET** /api/mirrors | List Mirrors
 [**api_mirrors_name_delete**](MirrorsApi.md#api_mirrors_name_delete) | **DELETE** /api/mirrors/{name} | Delete Mirror
@@ -12,6 +14,66 @@ Method | HTTP request | Description
 [**api_mirrors_name_put**](MirrorsApi.md#api_mirrors_name_put) | **PUT** /api/mirrors/{name} | Update Mirror
 [**api_mirrors_post**](MirrorsApi.md#api_mirrors_post) | **POST** /api/mirrors | Create Mirror
 
+
+
+## api_gpg_key_delete
+
+> String api_gpg_key_delete(request)
+Delete GPG Keys
+
+**Remove public keys from the aptly keyring**
+
+### Parameters
+
+
+Name | Type | Description  | Required | Notes
+------------- | ------------- | ------------- | ------------- | -------------
+**request** | [**ApiGpgDeleteKeyParams**](ApiGpgDeleteKeyParams.md) | Parameters | [required] |
+
+### Return type
+
+**String**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
+
+
+## api_gpg_key_get
+
+> Vec<models::ApiGpgKeyInfo> api_gpg_key_get(keyring)
+List GPG Keys
+
+**List public keys in the aptly keyring with structured metadata and armored keys**
+
+### Parameters
+
+
+Name | Type | Description  | Required | Notes
+------------- | ------------- | ------------- | ------------- | -------------
+**keyring** | Option<**String**> | keyring to list keys from (default: trustedkeys.gpg) |  |
+
+### Return type
+
+[**Vec<models::ApiGpgKeyInfo>**](api.gpgKeyInfo.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints) [[Back to Model list]](../README.md#documentation-for-models) [[Back to README]](../README.md)
 
 
 ## api_gpg_key_post

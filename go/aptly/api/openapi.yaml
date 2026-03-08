@@ -14,7 +14,7 @@ info:
 
     #### Aptly REST API Documentation
   title: Aptly API
-  version: 1.6.2+20260228114657.9defe70
+  version: 1.6.2+20260308145521.8e943a3
 servers:
 - url: /
 tags:
@@ -361,6 +361,59 @@ paths:
       tags:
       - Files
   /api/gpg/key:
+    delete:
+      description: '**Remove public keys from the aptly keyring**'
+      requestBody:
+        content:
+          '*/*':
+            schema:
+              $ref: "#/components/schemas/api.gpgDeleteKeyParams"
+        description: Parameters
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: string
+          description: OK
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+      summary: Delete GPG Keys
+      tags:
+      - Mirrors
+      x-codegen-request-body-name: request
+    get:
+      description: '**List public keys in the aptly keyring with structured metadata
+        and armored keys**'
+      parameters:
+      - description: "keyring to list keys from (default: trustedkeys.gpg)"
+        in: query
+        name: Keyring
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/api.gpgKeyInfo"
+                type: array
+          description: List of GPG keys
+        "400":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Bad Request
+      summary: List GPG Keys
+      tags:
+      - Mirrors
     post:
       description: |
         **Adds GPG keys to aptly keyring**
@@ -814,6 +867,41 @@ paths:
                 $ref: "#/components/schemas/api.Error"
           description: Not Found
       summary: Get Package Info
+      tags:
+      - Packages
+  /api/packages/{key}/file:
+    get:
+      description: |-
+        **Download a package file directly from the pool by package key**
+        Serves the first (primary) file associated with the package.
+      parameters:
+      - description: package key (unique package identifier)
+        in: path
+        name: key
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/octet-stream:
+              schema:
+                format: binary
+                type: string
+          description: Package file content
+        "404":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Package not found or has no files
+        "500":
+          content:
+            application/octet-stream:
+              schema:
+                $ref: "#/components/schemas/api.Error"
+          description: Internal error
+      summary: Download Package File
       tags:
       - Packages
   /api/publish:
@@ -3028,6 +3116,90 @@ components:
         Keyserver:
           description: Keyserver to download keys provided in `GpgKeyID`
           example: hkp://keyserver.ubuntu.com:80
+          type: string
+      type: object
+    api.gpgDeleteKeyParams:
+      properties:
+        GpgKeyID:
+          description: "Key fingerprints or IDs to delete, separated by space"
+          example: EF0F382A1A7B6500
+          type: string
+        Keyring:
+          description: "Keyring to delete keys from (default: trustedkeys.gpg)"
+          example: trustedkeys.gpg
+          type: string
+      type: object
+    api.gpgKeyInfo:
+      example:
+        SubKeys:
+        - SubKeys
+        - SubKeys
+        CreationDate: "1741269527"
+        Validity: u
+        Fingerprint: 9449F29EB3CB1295B0DB5BC663668AF6C046C184
+        ExpirationDate: ""
+        Armor: |-
+          -----BEGIN PGP PUBLIC KEY BLOCK-----
+          ...
+          -----END PGP PUBLIC KEY BLOCK-----
+        Capabilities: scSC
+        KeyID: 63668AF6C046C184
+        Algorithm: "22"
+        KeyLength: "255"
+        UserIDs:
+        - "[\"User Name <user@example.com>\"]"
+      properties:
+        Algorithm:
+          description: "Public key algorithm (e.g. 1=RSA, 17=DSA, 22=EdDSA)"
+          example: "22"
+          type: string
+        Armor:
+          description: ASCII armored public key
+          example: |-
+            -----BEGIN PGP PUBLIC KEY BLOCK-----
+            ...
+            -----END PGP PUBLIC KEY BLOCK-----
+          type: string
+        Capabilities:
+          description: "Key capabilities (e=encrypt, s=sign, c=certify, a=authenticate)"
+          example: scSC
+          type: string
+        CreationDate:
+          description: Key creation date (Unix timestamp or ISO date)
+          example: "1741269527"
+          type: string
+        ExpirationDate:
+          description: Key expiration date (empty if no expiry)
+          example: ""
+          type: string
+        Fingerprint:
+          description: Full key fingerprint
+          example: 9449F29EB3CB1295B0DB5BC663668AF6C046C184
+          type: string
+        KeyID:
+          description: Key ID (short)
+          example: 63668AF6C046C184
+          type: string
+        KeyLength:
+          description: Key length in bits
+          example: "255"
+          type: string
+        SubKeys:
+          description: Subkey IDs
+          items:
+            type: string
+          type: array
+        UserIDs:
+          description: User IDs associated with this key
+          example:
+          - "[\"User Name <user@example.com>\"]"
+          items:
+            type: string
+          type: array
+        Validity:
+          description: "Key validity (u=ultimate, f=full, m=marginal, n=never, e=expired,\
+            \ r=revoked)"
+          example: u
           type: string
       type: object
     api.mirrorCreateParams:

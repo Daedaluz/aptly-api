@@ -4,6 +4,8 @@ All URIs are relative to *http://localhost*
 
 Method | HTTP request | Description
 ------------- | ------------- | -------------
+[**ApiGpgKeyDelete**](MirrorsAPI.md#ApiGpgKeyDelete) | **Delete** /api/gpg/key | Delete GPG Keys
+[**ApiGpgKeyGet**](MirrorsAPI.md#ApiGpgKeyGet) | **Get** /api/gpg/key | List GPG Keys
 [**ApiGpgKeyPost**](MirrorsAPI.md#ApiGpgKeyPost) | **Post** /api/gpg/key | Add GPG Keys
 [**ApiMirrorsGet**](MirrorsAPI.md#ApiMirrorsGet) | **Get** /api/mirrors | List Mirrors
 [**ApiMirrorsNameDelete**](MirrorsAPI.md#ApiMirrorsNameDelete) | **Delete** /api/mirrors/{name} | Delete Mirror
@@ -12,6 +14,138 @@ Method | HTTP request | Description
 [**ApiMirrorsNamePut**](MirrorsAPI.md#ApiMirrorsNamePut) | **Put** /api/mirrors/{name} | Update Mirror
 [**ApiMirrorsPost**](MirrorsAPI.md#ApiMirrorsPost) | **Post** /api/mirrors | Create Mirror
 
+
+
+## ApiGpgKeyDelete
+
+> string ApiGpgKeyDelete(ctx).Request(request).Execute()
+
+Delete GPG Keys
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/daedaluz/aptly-api"
+)
+
+func main() {
+	request := *openapiclient.NewApiGpgDeleteKeyParams() // ApiGpgDeleteKeyParams | Parameters
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.MirrorsAPI.ApiGpgKeyDelete(context.Background()).Request(request).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `MirrorsAPI.ApiGpgKeyDelete``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ApiGpgKeyDelete`: string
+	fmt.Fprintf(os.Stdout, "Response from `MirrorsAPI.ApiGpgKeyDelete`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiApiGpgKeyDeleteRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **request** | [**ApiGpgDeleteKeyParams**](ApiGpgDeleteKeyParams.md) | Parameters | 
+
+### Return type
+
+**string**
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
+
+
+## ApiGpgKeyGet
+
+> []ApiGpgKeyInfo ApiGpgKeyGet(ctx).Keyring(keyring).Execute()
+
+List GPG Keys
+
+
+
+### Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"os"
+	openapiclient "github.com/daedaluz/aptly-api"
+)
+
+func main() {
+	keyring := "keyring_example" // string | keyring to list keys from (default: trustedkeys.gpg) (optional)
+
+	configuration := openapiclient.NewConfiguration()
+	apiClient := openapiclient.NewAPIClient(configuration)
+	resp, r, err := apiClient.MirrorsAPI.ApiGpgKeyGet(context.Background()).Keyring(keyring).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error when calling `MirrorsAPI.ApiGpgKeyGet``: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	}
+	// response from `ApiGpgKeyGet`: []ApiGpgKeyInfo
+	fmt.Fprintf(os.Stdout, "Response from `MirrorsAPI.ApiGpgKeyGet`: %v\n", resp)
+}
+```
+
+### Path Parameters
+
+
+
+### Other Parameters
+
+Other parameters are passed through a pointer to a apiApiGpgKeyGetRequest struct via the builder pattern
+
+
+Name | Type | Description  | Notes
+------------- | ------------- | ------------- | -------------
+ **keyring** | **string** | keyring to list keys from (default: trustedkeys.gpg) | 
+
+### Return type
+
+[**[]ApiGpgKeyInfo**](ApiGpgKeyInfo.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: application/json
+
+[[Back to top]](#) [[Back to API list]](../README.md#documentation-for-api-endpoints)
+[[Back to Model list]](../README.md#documentation-for-models)
+[[Back to README]](../README.md)
 
 
 ## ApiGpgKeyPost

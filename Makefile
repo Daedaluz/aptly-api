@@ -1,5 +1,5 @@
-APTLY_VERSION ?= master
-APTLY_REPO    := https://github.com/aptly-dev/aptly.git
+APTLY_VERSION ?= extended-api
+APTLY_REPO    := https://github.com/daedaluz/aptly-dev.git
 APTLY_SRC     := .aptly-src
 SWAGGER_JSON  := $(APTLY_SRC)/docs/swagger.json
 
