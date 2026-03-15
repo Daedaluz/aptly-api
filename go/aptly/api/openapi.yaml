@@ -14,7 +14,7 @@ info:
 
     #### Aptly REST API Documentation
   title: Aptly API
-  version: 1.6.2+20260308145521.8e943a3
+  version: 1.6.2+20260315225119.eb0ae3a
 servers:
 - url: /
 tags:
@@ -3318,6 +3318,10 @@ components:
           description: setting to yes excludes upgrades from the NotAutomic setting
           example: ""
           type: string
+        Description:
+          description: "Value of Description: field in published repository stanza"
+          example: ""
+          type: string
         Distribution:
           description: "Distribution name, if missing Aptly would try to guess from\
             \ sources"
@@ -3388,6 +3392,10 @@ components:
           description: Provide index files by hash
           example: false
           type: boolean
+        Description:
+          description: "Value of Description: field in published repository stanza"
+          example: ""
+          type: string
         ForceOverwrite:
           description: "when publishing, overwrite files in pool/ directory without\
             \ notice"
@@ -3435,6 +3443,10 @@ components:
           description: Provide index files by hash
           example: false
           type: boolean
+        Description:
+          description: "Value of Description: field in published repository stanza"
+          example: ""
+          type: string
         ForceOverwrite:
           description: "when publishing, overwrite files in pool/ directory without\
             \ notice"
@@ -3846,6 +3858,7 @@ components:
       example:
         Origin: Origin
         SourceKind: SourceKind
+        Description: Description
         SignedBy: SignedBy
         SourceUUID: SourceUUID
         MultiDist: true
@@ -3884,6 +3897,8 @@ components:
         Component:
           description: Legacy fields for compatibility with old published repositories
             (< 0.6)
+          type: string
+        Description:
           type: string
         Distribution:
           type: string

@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **but_automatic_upgrades** | Option<**String**> |  | [optional]
 **codename** | Option<**String**> |  | [optional]
 **component** | Option<**String**> | Legacy fields for compatibility with old published repositories (< 0.6) | [optional]
+**description** | Option<**String**> |  | [optional]
 **distribution** | Option<**String**> |  | [optional]
 **label** | Option<**String**> |  | [optional]
 **multi_dist** | Option<**bool**> | Support multiple distributions | [optional]

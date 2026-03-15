@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `acquireByHash` | boolean
+`description` | string
 `forceOverwrite` | boolean
 `label` | string
 `multiDist` | boolean
@@ -26,6 +27,7 @@ import type { ApiPublishedRepoUpdateSwitchParams } from ''
 // TODO: Update the object below with actual values
 const example = {
   "acquireByHash": false,
+  "description": ,
   "forceOverwrite": false,
   "label": Debian,
   "multiDist": false,

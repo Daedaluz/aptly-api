@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 **acquire_by_hash** | Option<**bool**> | Provide index files by hash | [optional]
 **architectures** | Option<**Vec<String>**> | Override list of published architectures | [optional]
 **but_automatic_upgrades** | Option<**String**> | setting to yes excludes upgrades from the NotAutomic setting | [optional]
+**description** | Option<**String**> | Value of Description: field in published repository stanza | [optional]
 **distribution** | Option<**String**> | Distribution name, if missing Aptly would try to guess from sources | [optional]
 **force_overwrite** | Option<**bool**> | when publishing, overwrite files in pool/ directory without notice | [optional]
 **label** | Option<**String**> | Value of Label: field in published repository stanza | [optional]

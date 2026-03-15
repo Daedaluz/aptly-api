@@ -5,6 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **AcquireByHash** | Pointer to **bool** | Provide index files by hash | [optional] 
+**Description** | Pointer to **string** | Value of Description: field in published repository stanza | [optional] 
 **ForceOverwrite** | Pointer to **bool** | when publishing, overwrite files in pool/ directory without notice | [optional] 
 **Label** | Pointer to **string** | Value of Label: field in published repository stanza | [optional] 
 **MultiDist** | Pointer to **bool** | Enable multiple packages with the same filename in different distributions | [optional] 
@@ -59,6 +60,31 @@ SetAcquireByHash sets AcquireByHash field to given value.
 `func (o *ApiPublishedRepoUpdateSwitchParams) HasAcquireByHash() bool`
 
 HasAcquireByHash returns a boolean if a field has been set.
+
+### GetDescription
+
+`func (o *ApiPublishedRepoUpdateSwitchParams) GetDescription() string`
+
+GetDescription returns the Description field if non-nil, zero value otherwise.
+
+### GetDescriptionOk
+
+`func (o *ApiPublishedRepoUpdateSwitchParams) GetDescriptionOk() (*string, bool)`
+
+GetDescriptionOk returns a tuple with the Description field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetDescription
+
+`func (o *ApiPublishedRepoUpdateSwitchParams) SetDescription(v string)`
+
+SetDescription sets Description field to given value.
+
+### HasDescription
+
+`func (o *ApiPublishedRepoUpdateSwitchParams) HasDescription() bool`
+
+HasDescription returns a boolean if a field has been set.
 
 ### GetForceOverwrite
 

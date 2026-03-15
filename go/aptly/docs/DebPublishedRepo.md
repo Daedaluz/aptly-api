@@ -9,6 +9,7 @@ Name | Type | Description | Notes
 **ButAutomaticUpgrades** | Pointer to **string** |  | [optional] 
 **Codename** | Pointer to **string** |  | [optional] 
 **Component** | Pointer to **string** | Legacy fields for compatibility with old published repositories (&lt; 0.6) | [optional] 
+**Description** | Pointer to **string** |  | [optional] 
 **Distribution** | Pointer to **string** |  | [optional] 
 **Label** | Pointer to **string** |  | [optional] 
 **MultiDist** | Pointer to **bool** | Support multiple distributions | [optional] 
@@ -169,6 +170,31 @@ SetComponent sets Component field to given value.
 `func (o *DebPublishedRepo) HasComponent() bool`
 
 HasComponent returns a boolean if a field has been set.
+
+### GetDescription
+
+`func (o *DebPublishedRepo) GetDescription() string`
+
+GetDescription returns the Description field if non-nil, zero value otherwise.
+
+### GetDescriptionOk
+
+`func (o *DebPublishedRepo) GetDescriptionOk() (*string, bool)`
+
+GetDescriptionOk returns a tuple with the Description field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetDescription
+
+`func (o *DebPublishedRepo) SetDescription(v string)`
+
+SetDescription sets Description field to given value.
+
+### HasDescription
+
+`func (o *DebPublishedRepo) HasDescription() bool`
+
+HasDescription returns a boolean if a field has been set.
 
 ### GetDistribution
 

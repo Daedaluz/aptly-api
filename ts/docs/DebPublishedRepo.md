@@ -11,6 +11,7 @@ Name | Type
 `butAutomaticUpgrades` | string
 `codename` | string
 `component` | string
+`description` | string
 `distribution` | string
 `label` | string
 `multiDist` | boolean
@@ -40,6 +41,7 @@ const example = {
   "butAutomaticUpgrades": null,
   "codename": null,
   "component": null,
+  "description": null,
   "distribution": null,
   "label": null,
   "multiDist": null,

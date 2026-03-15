@@ -9,6 +9,7 @@ Name | Type
 `acquireByHash` | boolean
 `architectures` | Array&lt;string&gt;
 `butAutomaticUpgrades` | string
+`description` | string
 `distribution` | string
 `forceOverwrite` | boolean
 `label` | string
@@ -33,6 +34,7 @@ const example = {
   "acquireByHash": false,
   "architectures": [amd64, armhf],
   "butAutomaticUpgrades": ,
+  "description": ,
   "distribution": bookworm,
   "forceOverwrite": false,
   "label": ,

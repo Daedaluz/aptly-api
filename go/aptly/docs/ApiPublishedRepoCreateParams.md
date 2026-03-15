@@ -7,6 +7,7 @@ Name | Type | Description | Notes
 **AcquireByHash** | Pointer to **bool** | Provide index files by hash | [optional] 
 **Architectures** | Pointer to **[]string** | Override list of published architectures | [optional] 
 **ButAutomaticUpgrades** | Pointer to **string** | setting to yes excludes upgrades from the NotAutomic setting | [optional] 
+**Description** | Pointer to **string** | Value of Description: field in published repository stanza | [optional] 
 **Distribution** | Pointer to **string** | Distribution name, if missing Aptly would try to guess from sources | [optional] 
 **ForceOverwrite** | Pointer to **bool** | when publishing, overwrite files in pool/ directory without notice | [optional] 
 **Label** | Pointer to **string** | Value of Label: field in published repository stanza | [optional] 
@@ -114,6 +115,31 @@ SetButAutomaticUpgrades sets ButAutomaticUpgrades field to given value.
 `func (o *ApiPublishedRepoCreateParams) HasButAutomaticUpgrades() bool`
 
 HasButAutomaticUpgrades returns a boolean if a field has been set.
+
+### GetDescription
+
+`func (o *ApiPublishedRepoCreateParams) GetDescription() string`
+
+GetDescription returns the Description field if non-nil, zero value otherwise.
+
+### GetDescriptionOk
+
+`func (o *ApiPublishedRepoCreateParams) GetDescriptionOk() (*string, bool)`
+
+GetDescriptionOk returns a tuple with the Description field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetDescription
+
+`func (o *ApiPublishedRepoCreateParams) SetDescription(v string)`
+
+SetDescription sets Description field to given value.
+
+### HasDescription
+
+`func (o *ApiPublishedRepoCreateParams) HasDescription() bool`
+
+HasDescription returns a boolean if a field has been set.
 
 ### GetDistribution
 
