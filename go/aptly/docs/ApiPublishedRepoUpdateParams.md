@@ -5,6 +5,7 @@
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
 **AcquireByHash** | Pointer to **bool** | Provide index files by hash | [optional] 
+**Architectures** | Pointer to **[]string** | Override list of published architectures | [optional] 
 **Description** | Pointer to **string** | Value of Description: field in published repository stanza | [optional] 
 **ForceOverwrite** | Pointer to **bool** | when publishing, overwrite files in pool/ directory without notice | [optional] 
 **Label** | Pointer to **string** | Value of Label: field in published repository stanza | [optional] 
@@ -59,6 +60,31 @@ SetAcquireByHash sets AcquireByHash field to given value.
 `func (o *ApiPublishedRepoUpdateParams) HasAcquireByHash() bool`
 
 HasAcquireByHash returns a boolean if a field has been set.
+
+### GetArchitectures
+
+`func (o *ApiPublishedRepoUpdateParams) GetArchitectures() []string`
+
+GetArchitectures returns the Architectures field if non-nil, zero value otherwise.
+
+### GetArchitecturesOk
+
+`func (o *ApiPublishedRepoUpdateParams) GetArchitecturesOk() (*[]string, bool)`
+
+GetArchitecturesOk returns a tuple with the Architectures field if it's non-nil, zero value otherwise
+and a boolean to check if the value has been set.
+
+### SetArchitectures
+
+`func (o *ApiPublishedRepoUpdateParams) SetArchitectures(v []string)`
+
+SetArchitectures sets Architectures field to given value.
+
+### HasArchitectures
+
+`func (o *ApiPublishedRepoUpdateParams) HasArchitectures() bool`
+
+HasArchitectures returns a boolean if a field has been set.
 
 ### GetDescription
 

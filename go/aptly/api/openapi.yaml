@@ -14,7 +14,7 @@ info:
 
     #### Aptly REST API Documentation
   title: Aptly API
-  version: 1.6.2+20260315225119.eb0ae3a
+  version: 1.6.2+20260316002414.a40994d
 servers:
 - url: /
 tags:
@@ -3392,6 +3392,14 @@ components:
           description: Provide index files by hash
           example: false
           type: boolean
+        Architectures:
+          description: Override list of published architectures
+          example:
+          - amd64
+          - armhf
+          items:
+            type: string
+          type: array
         Description:
           description: "Value of Description: field in published repository stanza"
           example: ""
@@ -3443,6 +3451,14 @@ components:
           description: Provide index files by hash
           example: false
           type: boolean
+        Architectures:
+          description: Override list of published architectures
+          example:
+          - amd64
+          - armhf
+          items:
+            type: string
+          type: array
         Description:
           description: "Value of Description: field in published repository stanza"
           example: ""

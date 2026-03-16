@@ -7,6 +7,7 @@
 Name | Type
 ------------ | -------------
 `acquireByHash` | boolean
+`architectures` | Array&lt;string&gt;
 `description` | string
 `forceOverwrite` | boolean
 `label` | string
@@ -27,6 +28,7 @@ import type { ApiPublishedRepoUpdateSwitchParams } from ''
 // TODO: Update the object below with actual values
 const example = {
   "acquireByHash": false,
+  "architectures": [amd64, armhf],
   "description": ,
   "forceOverwrite": false,
   "label": Debian,
